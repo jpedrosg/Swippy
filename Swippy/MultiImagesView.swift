@@ -385,74 +385,77 @@ struct MultiImagesView: View {
             } else {
                 GeometryReader { geometry in
                     NavigationView {
-                        ZStack {
-                            ForEach(deck.cards) { card in
-                                CardView(isFullScreen: true, card: card)
-                                    .navigationBarTitle("\(fullScreenIndex+1) of \(deck.cards.count)", displayMode: .inline)
-                                    .navigationBarItems(
-                                        leading:
-                                            Button(action: {
-                                                showFullScreen.toggle()
-                                            }, label: {
-                                                Text("Done").font(Font.body.weight(.semibold))
-                                            }),
-                                        trailing:
-                                            Button {
-                                                showSheet.toggle()
-                                            } label: {
-                                                Label("Share Product", systemImage: "square.and.arrow.up")
-                                            })
-                                    .navigationViewStyle(StackNavigationViewStyle())
-                                    .navigationBarHidden(navBarHidden)
-                                    .onTapGesture(perform: {
-                                        withAnimation {
-                                            UIScreen.main.focusedView?.window?.backgroundColor = .black
-                                            navBarHidden.toggle()
-                                        }
-                                    })
-                                    .matchedGeometryEffect(id: card.id, in: animation, isSource: true)
-                                    .background(navBarHidden ? Color.black : Color.clear).edgesIgnoringSafeArea(.all)
-                                    .offset(CGSize(width: (CGFloat(deck.position(of: card, in: deck.cards)-1) * geometry.size.width)  + deck.fullScreenTopCardOffset.width, height: 0))
-                                    .sheet(isPresented: $showSheet) {} content: {
-                                        if let image = deck.rightCards.first?.image {
-                                            ShareSheet(items: [image])
-                                        }
-                                    }
-                            }
-                        }
-                        .onAppear {
-                            UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation") // Forcing the rotation to portrait
-                            AppDelegate.orientationLock = .portrait // And making sure it stays that way
-                        }.onDisappear {
-                            AppDelegate.orientationLock = .all // Unlocking the rotation when leaving the view
-                        }
-                        .ignoresSafeArea()
-                        .gesture(
-                            DragGesture(minimumDistance: 0.0)
-                                .onChanged({ (drag) in
-                                    if !(drag.translation.width < 0 && fullScreenIndex == deck.cards.count-1)
-                                        && !(drag.translation.width > 0 && fullScreenIndex == 0) {
-                                        withAnimation(.linear) {
-                                            deck.fullScreenTopCardOffset = drag.translation
-                                        }
-                                    }
-                                })
-                                .onEnded({ (drag) in
-                                    withAnimation(.spring(response: 0.6)) {
-                                        if abs(deck.fullScreenTopCardOffset.width) > geometry.size.width*0.5 {
-                                            if drag.translation.width > 0 {
-                                                deck.moveToRight()
-                                                fullScreenIndex = fullScreenIndex-1
-                                            } else {
-                                                deck.moveToLeft()
-                                                fullScreenIndex = fullScreenIndex+1
+                        HStack {
+                            ZStack {
+                                ForEach(deck.cards) { card in
+                                    CardView(isFullScreen: true, card: card)
+                                        .navigationBarTitle("\(fullScreenIndex+1) of \(deck.cards.count)", displayMode: .inline)
+                                        .navigationBarItems(
+                                            leading:
+                                                Button(action: {
+                                                    showFullScreen.toggle()
+                                                }, label: {
+                                                    Text("Done").font(Font.body.weight(.semibold))
+                                                }),
+                                            trailing:
+                                                Button {
+                                                    showSheet.toggle()
+                                                } label: {
+                                                    Label("Share Product", systemImage: "square.and.arrow.up")
+                                                })
+                                        .navigationViewStyle(StackNavigationViewStyle())
+                                        .navigationBarHidden(navBarHidden)
+                                        .onTapGesture(perform: {
+                                            withAnimation {
+                                                UIScreen.main.focusedView?.window?.backgroundColor = .black
+                                                navBarHidden.toggle()
+                                            }
+                                        })
+                                        .matchedGeometryEffect(id: card.id, in: animation, isSource: true)
+                                        .background(navBarHidden ? Color.black : Color.clear).edgesIgnoringSafeArea(.all)
+                                        .offset(CGSize(width: (CGFloat(deck.position(of: card, in: deck.cards)-1) * geometry.size.width)  + deck.fullScreenTopCardOffset.width, height: 0))
+                                        .sheet(isPresented: $showSheet) {} content: {
+                                            if let image = deck.rightCards.first?.image {
+                                                ShareSheet(items: [image])
                                             }
                                         }
-                                        deck.fullScreenTopCardOffset = .zero
-                                    }
-                                })
-                        )
-                        .offset(x: CGFloat(fullScreenIndex) * -geometry.size.width, y: 0)
+                                }
+                            }
+                            .onAppear {
+                                UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+                                AppDelegate.orientationLock = .portrait
+                            }.onDisappear {
+                                AppDelegate.orientationLock = .all
+                            }
+                            .ignoresSafeArea()
+                            .gesture(
+                                DragGesture(minimumDistance: 0.0)
+                                    .onChanged({ (drag) in
+                                        if !(drag.translation.width < 0 && fullScreenIndex == deck.cards.count-1)
+                                            && !(drag.translation.width > 0 && fullScreenIndex == 0) {
+                                            withAnimation(.linear) {
+                                                deck.fullScreenTopCardOffset = drag.translation
+                                            }
+                                        }
+                                    })
+                                    .onEnded({ (drag) in
+                                        withAnimation(.spring(response: 0.6)) {
+                                            if abs(deck.fullScreenTopCardOffset.width) > geometry.size.width*0.5 {
+                                                if drag.translation.width > 0 {
+                                                    deck.moveToRight()
+                                                    fullScreenIndex = fullScreenIndex-1
+                                                } else {
+                                                    deck.moveToLeft()
+                                                    fullScreenIndex = fullScreenIndex+1
+                                                }
+                                            }
+                                            deck.fullScreenTopCardOffset = .zero
+                                        }
+                                    })
+                            )
+                            .offset(x: CGFloat(fullScreenIndex) * -geometry.size.width, y: 0)
+                        }
+                        .background(navBarHidden ? Color.black : Color.clear).ignoresSafeArea()
                     }
                 }
             }
