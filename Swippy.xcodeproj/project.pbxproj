@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C004B46126B9EF9100BB595A /* MultiImagesDeck.swift in Sources */ = {isa = PBXBuildFile; fileRef = C004B46026B9EF9100BB595A /* MultiImagesDeck.swift */; };
+		C004B46326BA029100BB595A /* MultiImagesCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C004B46226BA029100BB595A /* MultiImagesCardView.swift */; };
 		C01B173326AA509300171F0A /* SwippyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01B173226AA509300171F0A /* SwippyApp.swift */; };
 		C01B173526AA509300171F0A /* MultiImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01B173426AA509300171F0A /* MultiImagesView.swift */; };
 		C01B173726AA509400171F0A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C01B173626AA509400171F0A /* Assets.xcassets */; };
@@ -14,6 +16,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C004B46026B9EF9100BB595A /* MultiImagesDeck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiImagesDeck.swift; sourceTree = "<group>"; };
+		C004B46226BA029100BB595A /* MultiImagesCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiImagesCardView.swift; sourceTree = "<group>"; };
 		C01B172F26AA509300171F0A /* Swippy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Swippy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C01B173226AA509300171F0A /* SwippyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwippyApp.swift; sourceTree = "<group>"; };
 		C01B173426AA509300171F0A /* MultiImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiImagesView.swift; sourceTree = "<group>"; };
@@ -32,6 +36,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		C004B46426BA032C00BB595A /* MultiImages */ = {
+			isa = PBXGroup;
+			children = (
+				C01B173426AA509300171F0A /* MultiImagesView.swift */,
+				C004B46026B9EF9100BB595A /* MultiImagesDeck.swift */,
+				C004B46226BA029100BB595A /* MultiImagesCardView.swift */,
+			);
+			path = MultiImages;
+			sourceTree = "<group>";
+		};
 		C01B172626AA509300171F0A = {
 			isa = PBXGroup;
 			children = (
@@ -52,7 +66,7 @@
 			isa = PBXGroup;
 			children = (
 				C01B173226AA509300171F0A /* SwippyApp.swift */,
-				C01B173426AA509300171F0A /* MultiImagesView.swift */,
+				C004B46426BA032C00BB595A /* MultiImages */,
 				C01B173626AA509400171F0A /* Assets.xcassets */,
 				C01B173826AA509400171F0A /* Preview Content */,
 			);
@@ -137,7 +151,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C004B46126B9EF9100BB595A /* MultiImagesDeck.swift in Sources */,
 				C01B173526AA509300171F0A /* MultiImagesView.swift in Sources */,
+				C004B46326BA029100BB595A /* MultiImagesCardView.swift in Sources */,
 				C01B173326AA509300171F0A /* SwippyApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

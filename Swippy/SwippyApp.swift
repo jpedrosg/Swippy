@@ -14,7 +14,13 @@ struct SwippyApp: App {
     
     var body: some Scene {
         WindowGroup {
-            MultiImagesView(with: [#imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2")])
+            let viewModel = MultiImagesView.ViewModel(
+                leftNavigationButtonText: "Done",
+                rightNavigationButtonText: "Share Product",
+                rightNavigationButtonImage: "square.and.arrow.up",
+                topNavigationText: "%@ of %@",
+                images:  [#imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2")])
+            MultiImagesView(with: viewModel)
         }
     }
 }
