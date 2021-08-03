@@ -39,152 +39,251 @@ struct Deck {
     // MARK: - Initializers
     
     init(with images: [UIImage]) {
-        self.rightCards = images.compactMap({ Card(image: $0) })
-        self.activeCard = rightCards.first
+        self.cards = images.compactMap({ Card(image: $0) })
+        self.activeCard = cards.first
     }
     
     // MARK: - Properties
     
-    var fullScreenTopCardOffset: CGSize = .zero
-    var topCardOffset: CGSize = .zero
+    var activeCardIndex: Int = 0
+    
     var activeCard: Card?
-    
-    var leftCards: [Card] = [
-        .init(image: UIImage(), isEmptyCard: true)
-    ]
-    
-    var rightCards: [Card]
-    
-    var cards: [Card] {
-        let cards: [Card] = leftCards.reversed()+rightCards
-        return cards.filter({ !$0.isEmptyCard })
-    }
+    var fullScreenActiveCardOffset: CGSize = .zero
+    var storedActiveCardOffset: CGSize = .zero
+    var cards: [Card]
     
     
     // MARK: - Public API
     
-    func position(of card: Card, in cards: [Card]) -> Int {
+    func index(of card: Card) -> Int {
         guard let index = cards.firstIndex(of: card) else { return 0 }
         return index + 1
     }
     
 }
 
-// MARK: - Private API
+
+// MARK: - Helper
 
 private extension Deck {
     
-    func validateDrag(_ drag: DragGesture.Value) -> Bool {
-        let leftItemDraggingRight = activeCard == rightCards.first && leftCards.last?.isEmptyCard ?? false && drag.translation.width > 0
-        let rightItemDraggingLeft = activeCard == rightCards.last && drag.translation.width < 0
-        let outLimitsDrag = (abs(drag.translation.width/2) > CardView.Constants.movementDistance)
-        return !(leftItemDraggingRight || rightItemDraggingLeft || outLimitsDrag)
+    /// Returns the index of an `Card`.
+    func index(of card: Card?) -> Int {
+        guard let safeCard = card else { return 0 }
+        return cards.firstIndex(of: safeCard) ?? 0
     }
     
-    func position(of card: Card?, from side: CardsSide) -> Int {
-        guard let safeCard = card else { return 0 }
-        switch side {
-        case .left:
-            return leftCards.firstIndex(of: safeCard) ?? 0
-        case .right:
-            return rightCards.firstIndex(of: safeCard) ?? 0
+    /// Returns the index of an `Card`, related to the card that its active.
+    /// e.g.:
+    /// If the card of index `3` is active,
+    /// the ones with index `2` and `4` would have an `relativeIndex` equal to `1`.
+    func relativeIndex(of card: Card) -> Int {
+        let relative = index(of: card) - activeCardIndex
+        return relative > 0 ? abs(relative) - 1 : abs(relative) + 1
+    }
+    
+    func side(of card: Card) -> CardsSide {
+        if (index(of: card) - activeCardIndex) > 0 {
+            return .right
+        } else {
+            return .left
         }
     }
     
-    func zIndex(of card: Card, from side: CardsSide) -> Double {
-        
+    func isSwippingLeft() -> Bool {
+        return storedActiveCardOffset.width < 0
+    }
+    
+    func isSwippingRight() -> Bool {
+        return storedActiveCardOffset.width > 0
+    }
+    
+    /// Retuns an `Bool` value that indicates if the dragging movement of the user should reflect on the card offset.
+    func validateDrag(_ drag: DragGesture.Value) -> Bool {
+        // The last item should not bounce to the left.
+        let lastItemDraggingLeft = activeCard == cards.last && drag.translation.width < 0
+        // The first item should not bounce to the right.
+        let firstItemDraggingRight = activeCard == cards.first && drag.translation.width > 0
+        /*
+         When dragging an activeCard, after reaching more than 1.5x the needed width to perform an swipe movement,
+         we start ignoring the dragging to it won't re-appear in the other side.
+         */
+        let outLimitsDrag = (abs(drag.translation.width/2) > CardView.Constants.movementDistance)
+        return !(firstItemDraggingRight || lastItemDraggingLeft || outLimitsDrag)
+    }
+    
+    /// Retuns an `Bool` value that indicates if the dragging movement from the user reached the maximum distance, enough to perform an swipe.
+    func isDistantEnoughToSwipe() -> Bool {
+        let actualDistance = storedActiveCardOffset.width*CardView.Constants.movementMultiplier
+        return abs(actualDistance) > CardView.Constants.movementDistance
+    }
+    
+    /// Returns the correct `offset` width of the active card, compensating the extra width, after ther dragging movement reaches the necessary width to perfom an slide.
+    /// This creates the animation of the cards swiping to the back of the previous one, just like an cheap.
+    func getWidthCompensatingExtraMovement() -> CGFloat {
+        let currentOffsetWidth = storedActiveCardOffset.width*CardView.Constants.movementMultiplier
+        let extraOffsetWidth = abs(currentOffsetWidth) - CardView.Constants.movementDistance
+        if extraOffsetWidth > CardView.Constants.movementDistance { return 0 }
+        let finalOffSideWidth = CardView.Constants.movementDistance - extraOffsetWidth
+        return isSwippingRight() ? finalOffSideWidth : -finalOffSideWidth
+    }
+    
+    /// Returns a value between `1` and `0` that represents how close is the current `storedActiveCardOffset` width to the maximum active card width.
+    func getActiveCardOffsetPercentage() -> CGFloat {
+        if abs(storedActiveCardOffset.width) < CardView.Constants.movementDistance {
+            return abs(storedActiveCardOffset.width) / CardView.Constants.movementDistance
+        } else {
+            return 1
+        }
+    }
+}
+
+// MARK: - Position Source
+
+private extension Deck {
+    
+    // MARK: zIndex
+    
+    func zIndex(of card: Card) -> Double {
         enum zIndexPriority {
             static let high: Int = 99999
             static let medium: Int = 9999
             static let low: Int = 999
         }
         
-        
-        
-        if card == activeCard { return Double(zIndexPriority.medium) }
-        
-        if isDistantEnoughToSwipe() {
-            if topCardOffset.width > 0 && leftCards[1] == card  {
-                return Double(zIndexPriority.high)
-                
-            } else if topCardOffset.width < 0 && position(of: card, from: .right) == position(of: activeCard, from: .right)+1 {
-                return Double(zIndexPriority.high)
+        if card == activeCard {
+            // Active Card is always medium
+            return Double(zIndexPriority.medium)
+        } else {
+            // This way we block both the side items to swipe
+            if isDistantEnoughToSwipe() {
+                if isSwippingRight() && card == cards[activeCardIndex-1] {
+                    return Double(zIndexPriority.high)
+                } else if isSwippingLeft() && card == cards[activeCardIndex+1] {
+                    return Double(zIndexPriority.high)
+                }
+            }
+            
+            // Returns the index compairing to the position
+            var rightAditionalIndex = 0
+            var leftAditionalIndex = 0
+            
+            if isSwippingRight() {
+                rightAditionalIndex = -zIndexPriority.low
+            } else if isSwippingLeft() {
+                leftAditionalIndex = -zIndexPriority.low
+            }
+            
+            let indexFloat = cards.count - relativeIndex(of: card)
+            let side = side(of: card)
+            
+            switch side {
+            case .left:
+                return Double(indexFloat + leftAditionalIndex)
+            case .right:
+                return Double(indexFloat + rightAditionalIndex)
             }
         }
-        
-        
-        var rightAditionalIndex = 0
-        var leftAditionalIndex = 0
-        
-        if topCardOffset.width < 0 {
-            leftAditionalIndex = -zIndexPriority.low
+    }
+    
+    
+    // MARK: Scale
+    
+    func scale(of card: Card) -> CGFloat {
+        if card == activeCard {
+            return activeCardScale()
         } else {
-            rightAditionalIndex = -zIndexPriority.low
+            return backCardsScale(for: card)
+        }
+    }
+    
+    /// Returns the scale of the active card. The scale is inversely proportional to `offSet` width.
+    func activeCardScale() -> CGFloat {
+        let activeCardOffset = storedActiveCardOffset.width*CardView.Constants.movementMultiplier
+        let halfOffset = abs(activeCardOffset/2)
+        let maximumOffSetToSwipe = CardView.Constants.movementDistance
+        /*
+         The minimum scale will be 0.5.
+         It will happen when the card is in the exact maximum distance from the origin.
+         In this case, halfOffset/maximumOffSetToSwipe will equal 0.5.
+         
+         Other than this case, halfOffset/maximumOffSetToSwipe will result
+         on a number lower than 0.5, and higher or equal to 0.
+         */
+        let calculatedScale = abs(1 - (halfOffset/maximumOffSetToSwipe))
+        if isDistantEnoughToSwipe() {
+            return 1 - calculatedScale
+        } else {
+            return calculatedScale
+        }
+    }
+    
+    /// Returns the scale of the back cards. The scale is inversely proportional to `offSet` width of that card, that is proportional to its `relatedIndex`.
+    func backCardsScale(for card: Card) -> CGFloat {
+        let percentageMovement = getActiveCardOffsetPercentage()
+        let cardIndex = CGFloat(relativeIndex(of: card))
+        let side = side(of: card)
+        
+        /// Local function that returns the scale of an card, inversely proportional to its `index`.
+        func scaleForIndex(_ index: Double) -> CGFloat {
+            let decimalScale = pow(CardView.Constants.scaleMultiplier, index)
+            let doubleScale = NSDecimalNumber(decimal: Decimal(decimalScale)).doubleValue
+            let finalScale = CGFloat(doubleScale)
+            return finalScale
         }
         
         switch side {
-        case .right:
-            return Double(rightCards.count - position(of: card, from: .right) + rightAditionalIndex)
         case .left:
-            return Double(leftCards.count - position(of: card, from: .left) + leftAditionalIndex)
+            if isSwippingRight() {
+                return scaleForIndex(cardIndex-percentageMovement)
+            } else {
+                return scaleForIndex(cardIndex+percentageMovement)
+            }
+        case .right:
+            if isSwippingRight() {
+                return scaleForIndex(cardIndex+percentageMovement)
+            } else {
+                return scaleForIndex(cardIndex-percentageMovement)
+            }
         }
     }
     
-    func scale(of card: Card, from side: CardsSide) -> CGFloat {
+    // MARK: Offset
+    
+    func offset(for card: Card) -> CGSize {
         if card == activeCard {
-            let calculatedScale = abs((1 - abs(topCardOffset.width*CardView.Constants.movementMultiplier/2)/CardView.Constants.movementDistance))
-            if isDistantEnoughToSwipe() {
-                return 1 - calculatedScale
-            } else {
-                return calculatedScale
-            }
+            return activeCardOffset()
         } else {
-            
-            func scaleForPosition(_ position: Double) -> CGFloat {
-                let decimalScale = pow(CardView.Constants.scaleMultiplier, position)
-                let doubleScale = NSDecimalNumber(decimal: Decimal(decimalScale)).doubleValue
-                let finalScale = CGFloat(doubleScale)
-                return finalScale
-            }
-            
-            let cardPosition = CGFloat(position(of: card, from: side))
-            let percentageMovement = abs(topCardOffset.width) < CardView.Constants.movementDistance ? abs(topCardOffset.width) / CardView.Constants.movementDistance : 1
-            
-            if topCardOffset.width > 0 {
-                switch side {
-                case .left:
-                    return scaleForPosition(cardPosition-percentageMovement)
-                case .right:
-                    return scaleForPosition(cardPosition+percentageMovement)
-                }
-            } else {
-                switch side {
-                case .left:
-                    return scaleForPosition(cardPosition+percentageMovement)
-                case .right:
-                    return scaleForPosition(cardPosition-percentageMovement)
-                }
-            }
+            return CGSize(width: backCardsOffset(for: card), height: 0)
         }
     }
     
-    func offset(for card: Card, from side: CardsSide) -> CGSize {
-        if card != activeCard { return CGSize(width: backCardsOffset(of: card, from: side), height: 0) }
+    
+    /// Returns the `offSet` of the active card.
+    func activeCardOffset() -> CGSize {
         if isDistantEnoughToSwipe() {
             let finalOffSideWidth = getWidthCompensatingExtraMovement()
+            /*
+             The offsetHeight is proportional to the offsetWidth in a 0.4x relation.
+             We divide the finalOffSideWidth by the CardView.Constants.movementMultiplier before calculating
+             because the offsetHeight should not consider the horizontal movement multiplier.
+             */
             let finalOffSideHeight = -abs(finalOffSideWidth/CardView.Constants.movementMultiplier)*0.4
             return CGSize(width: finalOffSideWidth, height: finalOffSideHeight)
         } else {
-            return CGSize(width: topCardOffset.width*CardView.Constants.movementMultiplier, height: -abs(topCardOffset.width)*0.4)
+            return CGSize(width: storedActiveCardOffset.width*CardView.Constants.movementMultiplier, height: -abs(storedActiveCardOffset.width)*0.4)
         }
     }
     
-    func backCardsOffset(of card: Card, from side: CardsSide) -> CGFloat {
-        let deckPosition =  CGFloat(position(of: card, from: side))
+    func backCardsOffset(for card: Card) -> CGFloat {
+        let deckPosition = CGFloat(relativeIndex(of: card))
+        let side = side(of: card)
+        // Each card has an 12.5% offset related to its width
         let offSetMultiplier = CardView.Constants.squareSide / 8
         let offset = deckPosition * offSetMultiplier
-        let percentageMovement = abs(topCardOffset.width) < CardView.Constants.movementDistance ? abs(topCardOffset.width) / CardView.Constants.movementDistance : 1
-        if topCardOffset.width > 0 {
+        let percentageMovement = getActiveCardOffsetPercentage()
+        
+        if isSwippingRight() {
             switch side {
             case .left:
                 let finalOffset = offset-(offSetMultiplier*percentageMovement)
@@ -205,91 +304,70 @@ private extension Deck {
         }
     }
     
-    func rotation(for card: Card, from side: CardsSide) -> Angle {
-        if card != activeCard {
-            
-            func rotationForAboveCard(_ card: Card, _ side: CardsSide, _ degrees: Angle, _ percentageMovement: CGFloat) -> Angle {
-                let aboveDegrees = Angle.degrees(-Double(position(of: card, from: side)+1)*3)
-                let finalDegrees = degrees + ((degrees-aboveDegrees)*percentageMovement)
-                return finalDegrees
-            }
-            
-            func rotationForBehindCard(_ card: Card, _ side: CardsSide, _ degrees: Angle, _ percentageMovement: CGFloat) -> Angle {
-                let behindDegrees = Angle.degrees(-Double(position(of: card, from: side)-1)*3)
-                let finalDegrees = degrees - ((behindDegrees-degrees)*percentageMovement)
-                return finalDegrees
-            }
-            
-            let percentageMovement = abs(topCardOffset.width) < CardView.Constants.movementDistance ? abs(topCardOffset.width) / CardView.Constants.movementDistance : 1
-            let degrees = Angle.degrees(-Double(position(of: card, from: side))*3)
-            
-            if topCardOffset.width > 0 {
-                switch side {
-                case .left:
-                    return rotationForAboveCard(card, side, degrees, percentageMovement)
-                case .right:
-                    return rotationForBehindCard(card, side, degrees, percentageMovement)
-                }
-            } else {
-                switch side {
-                case .left:
-                    return rotationForBehindCard(card, side, degrees, percentageMovement)
-                case .right:
-                    return rotationForAboveCard(card, side, degrees, percentageMovement)
-                }
-            }
+    // MARK: Rotation
+    
+    func rotation(for card: Card) -> Angle {
+        if card == activeCard {
+            return activeCardRotation()
+        } else {
+            return backCardsRotation(for: card)
         }
-        
-        return activeCardRotation(for: card, offset: topCardOffset)
     }
     
-    func activeCardRotation(for card: Card, offset: CGSize = .zero) -> Angle {
+    func activeCardRotation() -> Angle {
         if isDistantEnoughToSwipe() {
-            return .degrees(-Double(getWidthCompensatingExtraMovement()/CardView.Constants.movementMultiplier) / 10)
+            return .degrees(Double(getWidthCompensatingExtraMovement()/CardView.Constants.movementMultiplier) / 10)
         } else {
-            return .degrees(-Double(offset.width) / 10)
+            return .degrees(Double(storedActiveCardOffset.width) / 10)
         }
-        
     }
     
-    func isDistantEnoughToSwipe(_ distance: CGFloat? = nil) -> Bool {
-        let actualDistance = distance ?? topCardOffset.width*CardView.Constants.movementMultiplier
-        return abs(actualDistance) > CardView.Constants.movementDistance
-    }
-    
-    func getWidthCompensatingExtraMovement() -> CGFloat {
-        let calculatedOffSetWidth = topCardOffset.width*CardView.Constants.movementMultiplier
-        let extraOffSideWidth = abs(calculatedOffSetWidth) - CardView.Constants.movementDistance
-        if extraOffSideWidth > CardView.Constants.movementDistance { return 0 }
-        let finalOffSideWidth = CardView.Constants.movementDistance - extraOffSideWidth
-        return calculatedOffSetWidth > 0 ? finalOffSideWidth : -finalOffSideWidth
+    func backCardsRotation(for card: Card) -> Angle {
+        let side = side(of: card)
+        func rotationForAboveCard(_ card: Card, _ side: CardsSide, _ degrees: Angle, _ percentageMovement: CGFloat) -> Angle {
+            let aboveDegrees = Angle.degrees(-Double(relativeIndex(of: card)+1)*3)
+            let finalDegrees = degrees + ((degrees-aboveDegrees)*percentageMovement)
+            return finalDegrees
+        }
+        func rotationForBehindCard(_ card: Card, _ side: CardsSide, _ degrees: Angle, _ percentageMovement: CGFloat) -> Angle {
+            let behindDegrees = Angle.degrees(-Double(relativeIndex(of: card)+1)*3)
+            let finalDegrees = degrees - ((behindDegrees-degrees)*percentageMovement)
+            return finalDegrees
+        }
+        let percentageMovement = abs(storedActiveCardOffset.width) < CardView.Constants.movementDistance ? abs(storedActiveCardOffset.width) / CardView.Constants.movementDistance : 1
+        let degrees = Angle.degrees(-Double(relativeIndex(of: card))*3)
+        if isSwippingRight() {
+            switch side {
+            case .left:
+                return rotationForAboveCard(card, side, degrees, percentageMovement)
+            case .right:
+                return -rotationForBehindCard(card, side, degrees, -percentageMovement)
+            }
+        } else {
+            switch side {
+            case .left:
+                return rotationForAboveCard(card, side, degrees, -percentageMovement)
+            case .right:
+                return -rotationForBehindCard(card, side, degrees, percentageMovement)
+            }
+        }
     }
 }
 
 // MARK: - Mutating API
 
 extension Deck {
-    mutating func moveToRight() {
-        if leftCards.count > 1 {
-            let leftCardMoving = leftCards.remove(at: 1)
-            rightCards.insert(leftCardMoving, at: 0)
+    mutating func move(to side: CardsSide) {
+        switch side {
+        case .left:
+            activeCardIndex = activeCardIndex+1
+            activeCard = cards[activeCardIndex]
+        case .right:
+            activeCardIndex = activeCardIndex-1
+            activeCard = cards[activeCardIndex]
         }
-        updateActiveCard()
-    }
-    
-    mutating func moveToLeft() {
-        if rightCards.count > 1 {
-            let rightCardMoving = rightCards.remove(at: 0)
-            leftCards.insert(rightCardMoving, at: 1)
-        }
-        updateActiveCard()
-    }
-    
-    mutating func updateActiveCard() {
-        if let card = rightCards.first {
-            activeCard = card
-        }
-        topCardOffset = .zero
+        storedActiveCardOffset = .zero
+        fullScreenActiveCardOffset = .zero
     }
 }
 
@@ -297,12 +375,15 @@ extension Deck {
 // MARK: - MultiImagesView
 
 struct MultiImagesView: View {
+    
     @Namespace var animation
     @State var showSheet = false
     @State var showDetail = false
     @State private var showFullScreen = false
     @State private var detailSelection = 0
     @State var deck: Deck
+    @State var navBarHidden: Bool = false
+    
     let coloredNavAppearance = UINavigationBarAppearance()
     
     init(with images: [UIImage]) {
@@ -313,24 +394,22 @@ struct MultiImagesView: View {
     }
     
     private func onEndedAnimation() {
-        if deck.topCardOffset.width*CardView.Constants.movementMultiplier < -CardView.Constants.movementDistance {
-            deck.moveToLeft()
-        } else if deck.topCardOffset.width*CardView.Constants.movementMultiplier > CardView.Constants.movementDistance {
-            deck.moveToRight()
+        if deck.storedActiveCardOffset.width*CardView.Constants.movementMultiplier < -CardView.Constants.movementDistance {
+            deck.move(to: .left)
+        } else if deck.storedActiveCardOffset.width*CardView.Constants.movementMultiplier > CardView.Constants.movementDistance {
+            deck.move(to: .right)
         }
-        deck.topCardOffset = .zero
+        deck.storedActiveCardOffset = .zero
     }
     
     private func onChangedAnimation(with dragGesture: DragGesture.Value) {
         if deck.validateDrag(dragGesture) {
-            deck.topCardOffset = dragGesture.translation
+            deck.storedActiveCardOffset = dragGesture.translation
         }
     }
     
-    private func updateFullscreenIndex() {
-        if let activeCard = deck.activeCard {
-            fullScreenIndex = deck.position(of: activeCard, in: deck.cards)-1
-        }
+    fileprivate func fullScreenOffset(for card: Card, with geometry: GeometryProxy) -> CGSize {
+        return CGSize(width: (CGFloat(deck.index(of: card)-1) * geometry.size.width)-1 + deck.fullScreenActiveCardOffset.width, height: 0)
     }
     
     var body: some View {
@@ -338,29 +417,14 @@ struct MultiImagesView: View {
             if !showFullScreen {
                 VStack {
                     ZStack {
-                        ForEach(deck.leftCards) { card in
-                            if card != deck.rightCards.first {
-                                CardView(isFullScreen: false, card: card)
-                                    .matchedGeometryEffect(id: card.id, in: animation, isSource: true)
-                                    .transition(.scale(scale: CardView.Constants.scaleMultiplier))
-                                    .zIndex(deck.zIndex(of: card, from: .left))
-                                    .offset(x: deck.offset(for: card, from: .left).width, y: deck.offset(for: card, from: .left).height)
-                                    .scaleEffect(x: deck.scale(of: card, from: .left), y: deck.scale(of: card, from: .left))
-                                    .rotationEffect(deck.rotation(for: card, from: .left))
-                            } else {
-                                CardView(isFullScreen: false, card: card)
-                                    .matchedGeometryEffect(id: card.id, in: animation, isSource: true)
-                                    .transition(.scale(scale: CardView.Constants.scaleMultiplier))
-                            }
-                        }
-                        ForEach(deck.rightCards) { card in
+                        ForEach(deck.cards) { card in
                             CardView(isFullScreen: false, card: card)
                                 .matchedGeometryEffect(id: card.id, in: animation, isSource: true)
                                 .transition(.scale(scale: CardView.Constants.scaleMultiplier))
-                                .zIndex(deck.zIndex(of: card, from: .right))
-                                .offset(x: deck.offset(for: card, from: .right).width, y: deck.offset(for: card, from: .right).height)
-                                .scaleEffect(x: deck.scale(of: card, from: .right), y: deck.scale(of: card, from: .right))
-                                .rotationEffect(-deck.rotation(for: card, from: .right))
+                                .zIndex(deck.zIndex(of: card))
+                                .offset(x: deck.offset(for: card).width, y: deck.offset(for: card).height)
+                                .scaleEffect(x: deck.scale(of: card), y: deck.scale(of: card))
+                                .rotationEffect(deck.rotation(for: card))
                                 .gesture(
                                     DragGesture()
                                         .onChanged({ (drag) in
@@ -372,7 +436,6 @@ struct MultiImagesView: View {
                                             withAnimation(.spring(response:0.6)) {
                                                 onEndedAnimation()
                                             }
-                                            updateFullscreenIndex()
                                         })
                                 )
                                 .onTapGesture {
@@ -389,7 +452,7 @@ struct MultiImagesView: View {
                             ZStack {
                                 ForEach(deck.cards) { card in
                                     CardView(isFullScreen: true, card: card)
-                                        .navigationBarTitle("\(fullScreenIndex+1) of \(deck.cards.count)", displayMode: .inline)
+                                        .navigationBarTitle("\(deck.activeCardIndex+1) of \(deck.cards.count)", displayMode: .inline)
                                         .navigationBarItems(
                                             leading:
                                                 Button(action: {
@@ -413,9 +476,9 @@ struct MultiImagesView: View {
                                         })
                                         .matchedGeometryEffect(id: card.id, in: animation, isSource: true)
                                         .background(navBarHidden ? Color.black : Color.clear).edgesIgnoringSafeArea(.all)
-                                        .offset(CGSize(width: (CGFloat(deck.position(of: card, in: deck.cards)-1) * geometry.size.width)  + deck.fullScreenTopCardOffset.width, height: 0))
+                                        .offset(fullScreenOffset(for: card, with: geometry))
                                         .sheet(isPresented: $showSheet) {} content: {
-                                            if let image = deck.rightCards.first?.image {
+                                            if let image = deck.activeCard?.image {
                                                 ShareSheet(items: [image])
                                             }
                                         }
@@ -431,29 +494,27 @@ struct MultiImagesView: View {
                             .gesture(
                                 DragGesture(minimumDistance: 0.0)
                                     .onChanged({ (drag) in
-                                        if !(drag.translation.width < 0 && fullScreenIndex == deck.cards.count-1)
-                                            && !(drag.translation.width > 0 && fullScreenIndex == 0) {
+                                        if !(drag.translation.width < 0 && deck.activeCardIndex == deck.cards.count-1)
+                                            && !(drag.translation.width > 0 && deck.activeCardIndex == 0) {
                                             withAnimation(.linear) {
-                                                deck.fullScreenTopCardOffset = drag.translation
+                                                deck.fullScreenActiveCardOffset = drag.translation
                                             }
                                         }
                                     })
                                     .onEnded({ (drag) in
                                         withAnimation(.spring(response: 0.6)) {
-                                            if abs(deck.fullScreenTopCardOffset.width) > geometry.size.width*0.5 {
+                                            if abs(deck.fullScreenActiveCardOffset.width) > geometry.size.width*0.5 {
                                                 if drag.translation.width > 0 {
-                                                    deck.moveToRight()
-                                                    fullScreenIndex = fullScreenIndex-1
+                                                    deck.move(to: .right)
                                                 } else {
-                                                    deck.moveToLeft()
-                                                    fullScreenIndex = fullScreenIndex+1
+                                                    deck.move(to: .left)
                                                 }
                                             }
-                                            deck.fullScreenTopCardOffset = .zero
+                                            deck.fullScreenActiveCardOffset = .zero
                                         }
                                     })
                             )
-                            .offset(x: CGFloat(fullScreenIndex) * -geometry.size.width, y: 0)
+                            .offset(x: CGFloat(deck.activeCardIndex) * -geometry.size.width, y: 0)
                         }
                         .background(navBarHidden ? Color.black : Color.clear).ignoresSafeArea()
                     }
@@ -461,11 +522,6 @@ struct MultiImagesView: View {
             }
         }
     }
-    
-    
-    
-    @State var navBarHidden: Bool = false
-    @State private var fullScreenIndex: Int = 0
 }
 
 struct ShareSheet: UIViewControllerRepresentable {
