@@ -11,17 +11,22 @@ struct MultiImagesDeck {
     
     // MARK: - Initializers
     
-    init(with images: [UIImage]) {
+    init(images: [UIImage], squareSide: CGFloat) {
         self.cards = images.compactMap({ Card(image: $0) })
+        self.squareSide = squareSide
     }
     
     // MARK: - Properties
     private var fullScreenActiveCardOffset: CGSize = .zero
     private var storedActiveCardOffset: CGSize = .zero
+    private var movementDistance: CGFloat {
+        return squareSide * 0.6
+    }
+    var squareSide: CGFloat = 220
     var activeCardIndex: Int = 0
     var cards: [Card]
     var activeCard: Card? {
-        return cards.count >= activeCardIndex && activeCardIndex > 0 ? cards[activeCardIndex] : nil
+        return cards.count >= activeCardIndex && activeCardIndex >= 0 ? cards[activeCardIndex] : nil
     }
 }
 
@@ -40,9 +45,9 @@ extension MultiImagesDeck {
     }
     
     mutating func onEndedAnimation() {
-        if storedActiveCardOffset.width*MultiImagesView.Constants.movementMultiplier < -MultiImagesView.Constants.movementDistance {
+        if storedActiveCardOffset.width*MultiImagesView.Constants.movementMultiplier < -movementDistance {
             move(to: .left)
-        } else if storedActiveCardOffset.width*MultiImagesView.Constants.movementMultiplier > MultiImagesView.Constants.movementDistance {
+        } else if storedActiveCardOffset.width*MultiImagesView.Constants.movementMultiplier > movementDistance {
             move(to: .right)
         }
         storedActiveCardOffset = .zero
@@ -136,6 +141,7 @@ extension MultiImagesDeck {
     func scale(of card: Card) -> CGFloat {
         if card == activeCard {
             return activeCardScale()
+            
         } else {
             return backCardsScale(for: card)
         }
@@ -186,6 +192,7 @@ private extension MultiImagesDeck {
         return relative > 0 ? abs(relative) - 1 : abs(relative) + 1
     }
     
+    /// Returns the "side" of the `Card`, that indicates if it is in the right or in the left compaired to the `activeCard`.
     func side(of card: Card) -> CardsSide {
         if (index(of: card) - activeCardIndex) > 0 {
             return .right
@@ -194,11 +201,12 @@ private extension MultiImagesDeck {
         }
     }
     
-    
+    /// Retuns an `Bool` value that indicates if activeCard is being swiped to `left`.
     func isSwippingLeft() -> Bool {
         return storedActiveCardOffset.width < 0
     }
     
+    /// Retuns an `Bool` value that indicates if activeCard is being swiped to `right`.
     func isSwippingRight() -> Bool {
         return storedActiveCardOffset.width > 0
     }
@@ -206,23 +214,23 @@ private extension MultiImagesDeck {
     /// Retuns an `Bool` value that indicates if the dragging movement from the user reached the maximum distance, enough to perform an swipe.
     func isDistantEnoughToSwipe() -> Bool {
         let actualDistance = storedActiveCardOffset.width*MultiImagesView.Constants.movementMultiplier
-        return abs(actualDistance) > MultiImagesView.Constants.movementDistance
+        return abs(actualDistance) > movementDistance
     }
     
     /// Returns the correct `offset` width of the active card, compensating the extra width, after ther dragging movement reaches the necessary width to perfom an slide.
     /// This creates the animation of the cards swiping to the back of the previous one, just like an cheap.
     func getWidthCompensatingExtraMovement() -> CGFloat {
         let currentOffsetWidth = storedActiveCardOffset.width*MultiImagesView.Constants.movementMultiplier
-        let extraOffsetWidth = abs(currentOffsetWidth) - MultiImagesView.Constants.movementDistance
-        if extraOffsetWidth > MultiImagesView.Constants.movementDistance { return 0 }
-        let finalOffSideWidth = MultiImagesView.Constants.movementDistance - extraOffsetWidth
+        let extraOffsetWidth = abs(currentOffsetWidth) - movementDistance
+        if extraOffsetWidth > movementDistance { return 0 }
+        let finalOffSideWidth = movementDistance - extraOffsetWidth
         return isSwippingRight() ? finalOffSideWidth : -finalOffSideWidth
     }
     
     /// Returns a value between `1` and `0` that represents how close is the current `storedActiveCardOffset` width to the maximum active card width.
     func getActiveCardOffsetPercentage() -> CGFloat {
-        if abs(storedActiveCardOffset.width) < MultiImagesView.Constants.movementDistance {
-            return abs(storedActiveCardOffset.width) / MultiImagesView.Constants.movementDistance
+        if abs(storedActiveCardOffset.width) < movementDistance {
+            return abs(storedActiveCardOffset.width) / movementDistance
         } else {
             return 1
         }
@@ -238,7 +246,7 @@ private extension MultiImagesDeck {
          When dragging an activeCard, after reaching more than 1.5x the needed width to perform an swipe movement,
          we start ignoring the dragging to it won't re-appear in the other side.
          */
-        let outLimitsDrag = (abs(drag.translation.width/2) > MultiImagesView.Constants.movementDistance)
+        let outLimitsDrag = (abs(drag.translation.width/2) > movementDistance)
         return !(firstItemDraggingRight || lastItemDraggingLeft || outLimitsDrag)
     }
     
@@ -248,7 +256,7 @@ private extension MultiImagesDeck {
     func activeCardScale() -> CGFloat {
         let activeCardOffset = storedActiveCardOffset.width*MultiImagesView.Constants.movementMultiplier
         let halfOffset = abs(activeCardOffset/2)
-        let maximumOffSetToSwipe = MultiImagesView.Constants.movementDistance
+        let maximumOffSetToSwipe = movementDistance
         /*
          The minimum scale will be 0.5.
          It will happen when the card is in the exact maximum distance from the origin.
@@ -324,7 +332,7 @@ private extension MultiImagesDeck {
          If the activeCard has a width of 200,
          the third card will have (0.125 x 200)x3 in offset.
          */
-        let offSetMultiplier = 0.125 * MultiImagesView.Constants.squareSide
+        let offSetMultiplier = 0.125 * squareSide
         let offset = deckPosition * offSetMultiplier
         let percentageMovement = getActiveCardOffsetPercentage()
         
@@ -351,6 +359,7 @@ private extension MultiImagesDeck {
     
     // MARK: Cards Rotation
     
+    /// Returns the `Rotation` angle of the active card.
     func activeCardRotation() -> Angle {
         if isDistantEnoughToSwipe() {
             return .degrees(Double(getWidthCompensatingExtraMovement()/MultiImagesView.Constants.movementMultiplier) / 10)
@@ -359,20 +368,23 @@ private extension MultiImagesDeck {
         }
     }
     
+    /// Returns the `Rotation` angle of the back cards. The offset is proportional to its `relativeIndex`.
+    /// Each card have an angle of `3 degrees` compaired to the one above it.
     func backCardsRotation(for card: Card) -> Angle {
+        let rotationAngle = 3.0
         let side = side(of: card)
         func rotationForAboveCard(_ card: Card, _ side: CardsSide, _ degrees: Angle, _ percentageMovement: CGFloat) -> Angle {
-            let aboveDegrees = Angle.degrees(-Double(relativeIndex(of: card)+1)*3)
+            let aboveDegrees = Angle.degrees(-Double(relativeIndex(of: card)+1)*rotationAngle)
             let finalDegrees = degrees + ((degrees-aboveDegrees)*percentageMovement)
             return finalDegrees
         }
         func rotationForBehindCard(_ card: Card, _ side: CardsSide, _ degrees: Angle, _ percentageMovement: CGFloat) -> Angle {
-            let behindDegrees = Angle.degrees(-Double(relativeIndex(of: card)+1)*3)
+            let behindDegrees = Angle.degrees(-Double(relativeIndex(of: card)+1)*rotationAngle)
             let finalDegrees = degrees - ((behindDegrees-degrees)*percentageMovement)
             return finalDegrees
         }
-        let percentageMovement = abs(storedActiveCardOffset.width) < MultiImagesView.Constants.movementDistance ? abs(storedActiveCardOffset.width) / MultiImagesView.Constants.movementDistance : 1
-        let degrees = Angle.degrees(-Double(relativeIndex(of: card))*3)
+        let percentageMovement = abs(storedActiveCardOffset.width) < movementDistance ? abs(storedActiveCardOffset.width) / movementDistance : 1
+        let degrees = Angle.degrees(-Double(relativeIndex(of: card))*rotationAngle)
         if isSwippingRight() {
             switch side {
             case .left:

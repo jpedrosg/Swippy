@@ -19,16 +19,20 @@ struct SwippyApp: App {
                 rightNavigationButtonText: "Share Product",
                 rightNavigationButtonImage: "square.and.arrow.up",
                 topNavigationText: "%@ of %@",
-                images:  [#imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2")])
-            MultiImagesView(with: viewModel)
+                images:  [#imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1")],
+                squareSide: 220)
+            
+            
+            VStack {
+                MultiImagesView(with: viewModel)
+                Spacer(minLength: 400)
+            }
         }
     }
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate {
-        
-    static var orientationLock = UIInterfaceOrientationMask.all //By default you want all your views to rotate freely
-
+    static var orientationLock = UIInterfaceOrientationMask.all
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         return AppDelegate.orientationLock
     }

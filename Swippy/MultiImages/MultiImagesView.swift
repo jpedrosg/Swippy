@@ -14,7 +14,8 @@ struct MultiImagesView_Previews: PreviewProvider {
             rightNavigationButtonText: "Share Product",
             rightNavigationButtonImage: "square.and.arrow.up",
             topNavigationText: "%@ of %@",
-            images:  [#imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2")])
+            images:  [#imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1")],
+            squareSide: 220)
         MultiImagesView(with: viewModel)
     }
 }
@@ -32,9 +33,7 @@ struct MultiImagesView: View {
         static let shadowX: CGFloat = 0
         static let lineWidth: CGFloat = 0.5
         static let animation: Animation = .spring(response:0.6)
-        static let squareSide: CGFloat = 220
         static let scaleMultiplier: CGFloat = 0.905
-        static let movementDistance: CGFloat = squareSide * 0.6
         static let movementMultiplier: CGFloat = 1.5
     }
     
@@ -53,7 +52,7 @@ struct MultiImagesView: View {
     
     init(with viewModel: ViewModel) {
         self.viewModel = viewModel
-        _deck = State(initialValue: MultiImagesDeck(with: viewModel.images))
+        _deck = State(initialValue: MultiImagesDeck(images: viewModel.images, squareSide: viewModel.squareSide))
         
         // Navigation Bar
         coloredNavAppearance.configureWithOpaqueBackground()
@@ -69,6 +68,7 @@ struct MultiImagesView: View {
         let rightNavigationButtonImage: String
         let topNavigationText: String
         let images: [UIImage]
+        let squareSide: CGFloat
     }
     
     // MARK: - Public Properties
@@ -76,35 +76,32 @@ struct MultiImagesView: View {
     var body: some View {
         ZStack {
             if !showFullScreen {
-                VStack {
-                    ZStack {
-                        ForEach(deck.cards) { card in
-                            MultiImagesCardView(isFullScreen: false, card: card)
-                                .matchedGeometryEffect(id: card.id, in: animation, isSource: true)
-                                .transition(.scale(scale: MultiImagesView.Constants.scaleMultiplier))
-                                .zIndex(deck.zIndex(of: card))
-                                .offset(x: deck.offset(for: card).width, y: deck.offset(for: card).height)
-                                .scaleEffect(x: deck.scale(of: card), y: deck.scale(of: card))
-                                .rotationEffect(deck.rotation(for: card))
-                                .gesture(
-                                    DragGesture()
-                                        .onChanged({ (drag) in
-                                            withAnimation(MultiImagesView.Constants.animation) {
-                                                deck.onChangedAnimation(with: drag)
-                                            }
-                                        })
-                                        .onEnded({ _ in
-                                            withAnimation(MultiImagesView.Constants.animation) {
-                                                deck.onEndedAnimation()
-                                            }
-                                        })
-                                )
-                                .onTapGesture {
-                                    showFullScreen.toggle()
-                                }
-                        }
+                ZStack {
+                    ForEach(deck.cards) { card in
+                        MultiImagesCardView(isFullScreen: false, card: card, squareSide: viewModel.squareSide)
+                            .matchedGeometryEffect(id: card.id, in: animation, isSource: true)
+                            .transition(.scale(scale: MultiImagesView.Constants.scaleMultiplier))
+                            .zIndex(deck.zIndex(of: card))
+                            .offset(x: deck.offset(for: card).width, y: deck.offset(for: card).height)
+                            .scaleEffect(x: deck.scale(of: card), y: deck.scale(of: card))
+                            .rotationEffect(deck.rotation(for: card))
+                            .gesture(
+                                DragGesture()
+                                    .onChanged({ (drag) in
+                                        withAnimation(MultiImagesView.Constants.animation) {
+                                            deck.onChangedAnimation(with: drag)
+                                        }
+                                    })
+                                    .onEnded({ _ in
+                                        withAnimation(MultiImagesView.Constants.animation) {
+                                            deck.onEndedAnimation()
+                                        }
+                                    })
+                            )
+                            .onTapGesture {
+                                showFullScreen.toggle()
+                            }
                     }
-                    Spacer(minLength: 400)
                 }
             } else {
                 GeometryReader { geometry in
@@ -112,7 +109,7 @@ struct MultiImagesView: View {
                         HStack {
                             ZStack {
                                 ForEach(deck.cards) { card in
-                                    MultiImagesCardView(isFullScreen: true, card: card)
+                                    MultiImagesCardView(isFullScreen: true, card: card, squareSide: viewModel.squareSide)
                                         .navigationBarTitle(String(format: viewModel.topNavigationText, String(deck.activeCardIndex+1), String(deck.cards.count)), displayMode: .inline)
                                         .navigationBarItems(
                                             leading:

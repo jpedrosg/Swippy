@@ -10,7 +10,7 @@ import SwiftUI
 struct MultiImagesCardView_Previews: PreviewProvider {
     static var previews: some View {
         let card = Card(image: #imageLiteral(resourceName: "Image1"))
-        MultiImagesCardView(isFullScreen: false, card: card)
+        MultiImagesCardView(isFullScreen: false, card: card, squareSide: 220)
     }
 }
 
@@ -35,15 +35,17 @@ struct MultiImagesCardView: View {
     
     // MARK: - Initializer
     
-    init(isFullScreen: Bool, card: Card) {
+    init(isFullScreen: Bool, card: Card, squareSide: CGFloat) {
         self.isFullScreen = isFullScreen
         self.card = card
+        self.squareSide = squareSide
     }
     
     // MARK: - Properties
     
     private let isFullScreen: Bool
     private let card: Card
+    private let squareSide: CGFloat
     
     // MARK: - Body
     
@@ -56,7 +58,7 @@ struct MultiImagesCardView: View {
                     Image(uiImage: card.image)
                         .resizable()
                         .aspectRatio(1, contentMode: .fill)
-                        .frame(width: MultiImagesView.Constants.squareSide, height: MultiImagesView.Constants.squareSide)
+                        .frame(width: squareSide, height: squareSide)
                         .cornerRadius(MultiImagesView.Constants.radius)
                         .shadow(color: MultiImagesView.Constants.greyColor, radius: MultiImagesView.Constants.radius, x: MultiImagesView.Constants.shadowX, y: MultiImagesView.Constants.shadowY)
                         .overlay(
