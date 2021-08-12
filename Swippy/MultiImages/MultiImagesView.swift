@@ -16,6 +16,7 @@ struct MultiImagesView_Previews: PreviewProvider {
             topNavigationText: "%@ of %@",
             images:  [#imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1")],
             squareSide: 220)
+        
         MultiImagesView(with: viewModel)
     }
 }
@@ -30,7 +31,6 @@ struct MultiImagesView: View {
         static let greyColor: Color = .init(.sRGB, red: 0, green: 0, blue: 0, opacity: 0.1)
         static let radius: CGFloat = 11
         static let shadowY: CGFloat = 4
-        static let shadowX: CGFloat = 0
         static let lineWidth: CGFloat = 0.5
         static let animation: Animation = .spring(response:0.6)
         static let scaleMultiplier: CGFloat = 0.905
@@ -46,7 +46,6 @@ struct MultiImagesView: View {
     @State private var deck: MultiImagesDeck
     private let viewModel: ViewModel
     private let coloredNavAppearance = UINavigationBarAppearance()
-    
     
     // MARK: - Initializer
     
@@ -78,7 +77,7 @@ struct MultiImagesView: View {
             if !showFullScreen {
                 ZStack {
                     ForEach(deck.cards) { card in
-                        MultiImagesCardView(isFullScreen: false, card: card, squareSide: viewModel.squareSide)
+                        MultiImagesCardView(isFullScreen: false, card: card, squareSide: viewModel.squareSide, isSingleImage: deck.cards.count == 1)
                             .matchedGeometryEffect(id: card.id, in: animation, isSource: true)
                             .transition(.scale(scale: MultiImagesView.Constants.scaleMultiplier))
                             .zIndex(deck.zIndex(of: card))
@@ -109,7 +108,7 @@ struct MultiImagesView: View {
                         HStack {
                             ZStack {
                                 ForEach(deck.cards) { card in
-                                    MultiImagesCardView(isFullScreen: true, card: card, squareSide: viewModel.squareSide)
+                                    MultiImagesCardView(isFullScreen: true, card: card, squareSide: viewModel.squareSide, isSingleImage: deck.cards.count == 1)
                                         .navigationBarTitle(String(format: viewModel.topNavigationText, String(deck.activeCardIndex+1), String(deck.cards.count)), displayMode: .inline)
                                         .navigationBarItems(
                                             leading:
@@ -160,7 +159,7 @@ struct MultiImagesView: View {
                                         }
                                     })
                                     .onEnded({ (drag) in
-                                        withAnimation(.spring(response: 0.6)) {
+                                        withAnimation(Constants.animation) {
                                             deck.onEndedFullscreenAnimation(drag: drag, geometry: geometry)
                                         }
                                     })

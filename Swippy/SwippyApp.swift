@@ -22,11 +22,7 @@ struct SwippyApp: App {
                 images:  [#imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1"), #imageLiteral(resourceName: "Image2"), #imageLiteral(resourceName: "Image1")],
                 squareSide: 220)
             
-            
-            VStack {
-                MultiImagesView(with: viewModel)
-                Spacer(minLength: 400)
-            }
+            MultiImagesView(with: viewModel)
         }
     }
 }

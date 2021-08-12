@@ -10,7 +10,7 @@ import SwiftUI
 struct MultiImagesCardView_Previews: PreviewProvider {
     static var previews: some View {
         let card = Card(image: #imageLiteral(resourceName: "Image1"))
-        MultiImagesCardView(isFullScreen: false, card: card, squareSide: 220)
+        MultiImagesCardView(isFullScreen: false, card: card, squareSide: 220, isSingleImage: true)
     }
 }
 
@@ -35,10 +35,11 @@ struct MultiImagesCardView: View {
     
     // MARK: - Initializer
     
-    init(isFullScreen: Bool, card: Card, squareSide: CGFloat) {
+    init(isFullScreen: Bool, card: Card, squareSide: CGFloat, isSingleImage: Bool) {
         self.isFullScreen = isFullScreen
         self.card = card
         self.squareSide = squareSide
+        self.isSingleImage = isSingleImage
     }
     
     // MARK: - Properties
@@ -46,6 +47,7 @@ struct MultiImagesCardView: View {
     private let isFullScreen: Bool
     private let card: Card
     private let squareSide: CGFloat
+    private let isSingleImage: Bool
     
     // MARK: - Body
     
@@ -60,7 +62,7 @@ struct MultiImagesCardView: View {
                         .aspectRatio(1, contentMode: .fill)
                         .frame(width: squareSide, height: squareSide)
                         .cornerRadius(MultiImagesView.Constants.radius)
-                        .shadow(color: MultiImagesView.Constants.greyColor, radius: MultiImagesView.Constants.radius, x: MultiImagesView.Constants.shadowX, y: MultiImagesView.Constants.shadowY)
+                        .shadow(color: isSingleImage ? .clear : MultiImagesView.Constants.greyColor, radius: MultiImagesView.Constants.radius, x: 0, y: MultiImagesView.Constants.shadowY)
                         .overlay(
                             RoundedRectangle(cornerRadius: MultiImagesView.Constants.radius)
                                 .stroke(MultiImagesView.Constants.greyColor, lineWidth: card.isEmptyCard ? 0 : MultiImagesView.Constants.lineWidth)
